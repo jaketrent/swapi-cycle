@@ -3,6 +3,8 @@ import { div, button, h1, ul, li, makeDOMDriver } from '@cycle/dom'
 import { makeHTTPDriver } from '@cycle/http'
 import Rx from 'rx'
 
+const byBrownHair = user => user.hair_color === 'brown'
+
 function main(sources) {
   const url = 'http://swapi.co/api/people/'
   const getUsers$ = Rx.Observable.just({ url, method: 'GET' })
@@ -18,7 +20,11 @@ function main(sources) {
       users.length > 0
         ? [
             h1('Swapi users'),
-            ul(users.map(user => li(user.name)))
+            ul(
+              users
+                .filter(byBrownHair)
+                .map(user => li(user.name))
+            )
           ]
         : div('Loading...')
     ])
