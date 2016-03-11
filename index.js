@@ -1,5 +1,5 @@
 import Cycle from '@cycle/core'
-import { div, button, ul, li, makeDOMDriver } from '@cycle/dom'
+import { div, button, h1, ul, li, makeDOMDriver } from '@cycle/dom'
 import { makeHTTPDriver } from '@cycle/http'
 import Rx from 'rx'
 
@@ -10,11 +10,18 @@ function main(sources) {
   const users$ = sources.HTTP
     .filter(res$ => res$.request.url === url)
     .mergeAll()
-    .map(res => res.body)
-    .startWith(null)
+    .map(res => res.body.results)
+    .startWith([])
 
-  const vtree$ = users$.map(user =>
-    div('swapi')
+  const vtree$ = users$.map(users =>
+    div([
+      users.length > 0
+        ? [
+            h1('Swapi users'),
+            ul(users.map(user => li(user.name)))
+          ]
+        : div('Loading...')
+    ])
   )
 
   return {
