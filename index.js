@@ -15,14 +15,16 @@ function main(sources) {
     .map(res => res.body.results)
     .startWith([])
 
-  const vtree$ = users$.map(users =>
+  const brownHairUsers$ = users$
+    .map(users => users.filter(byBrownHair))
+
+  const vtree$ = brownHairUsers$.map(users =>
     div([
       users.length > 0
         ? [
             h1('Swapi users'),
             ul(
               users
-                .filter(byBrownHair)
                 .map(user => li(user.name))
             )
           ]
