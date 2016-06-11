@@ -19,7 +19,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: 'node_modules/html-webpack-template/index.html',
+      template: 'node_modules/html-webpack-template/index.ejs',
       title: 'Cycle.js!',
       devServer: 'http://localhost:3000',
       appMountId: 'app'
