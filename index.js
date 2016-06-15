@@ -3,28 +3,37 @@ import { div, button, h1, ul, li, makeDOMDriver } from '@cycle/dom'
 import { makeHTTPDriver } from '@cycle/http'
 import { Observable } from 'rx'
 
-const url = 'http://swapi.co/api/people/'
+const url = 'http://swapi.co/api/people/1/'
 function main(sources) {
-  const requestUsers$ = Observable.just({ url })
+  const requestUser$ = Observable.just({ url })
 
-  const res$$ = sources.HTTP
-          .filter(res$ => res$.request.url === url)
+  const userRes$$ = sources.HTTP
+    .filter(res$ => res$.request.url === url)
 
-  const res$ = res$$.switch()
-  const users$ = res$.map(res => res.body.results)
+  const userRes$ = userRes$$.switch()
+  const user$ = userRes$.map(res => res.body)
+
+  const requestHomeworld$ = user$.map(user => {
+    return { url: user.homeworld, id: 'homeworld' } 
+  })
+
+  const homeworldRes$$ = sources.HTTP
+    .filter(res$ => res$.request.id === 'homeworld')
+
+  const homeworldRes$ = homeworldRes$$.switch()
+  const homeworld$ = homeworldRes$.map(res => res.body)
 
   return {
-    DOM: users$.map(users => 
-      ul(
-        users.map(user => li(`${user.name} - ${user.homeworld}`))
-      )
-    ),
-    HTTP: requestUsers$
+    DOM: Observable.combineLatest(user$, homeworld$, (user, homeworld) => {
+      return li(`${user.name} - ${homeworld.name}`)
+    }),
+
+    HTTP: Observable.merge(requestUser$, requestHomeworld$)
   }
 }
 const drivers = {
   DOM: makeDOMDriver('#app'),
-  HTTP: makeHTTPDriver()
+  HTTP: makeHTTPDriver({ eager: true })
 }
 
 Cycle.run(main, drivers)
