@@ -1,14 +1,14 @@
 import Cycle from '@cycle/core'
-import { div, button, h1, ul, li, makeDOMDriver } from '@cycle/dom'
+import { ul, li, makeDOMDriver } from '@cycle/dom'
 import { makeHTTPDriver } from '@cycle/http'
 import { Observable } from 'rx'
 
-const url = 'http://swapi.co/api/people/'
-function main(sources) {
+function intent(HTTPSource) {
+  const url = 'http://swapi.co/api/people/'
   const requestUsers$ = Observable.just({ url })
 
-  const usersRes$$ = sources.HTTP
-    .filter(res$ => res$.request.url === url)
+  const usersRes$$ = HTTPSource
+          .filter(res$ => res$.request.url === url)
 
   const usersRes$ = usersRes$$.switch()
   const users$ = usersRes$.map(res => res.body.results)
@@ -19,8 +19,8 @@ function main(sources) {
     })
   })
 
-  const homeworldsRes$$ = sources.HTTP
-    .filter(res$ => res$.request.id === 'homeworld')
+  const homeworldsRes$$ = HTTPSource
+          .filter(res$ => res$.request.id === 'homeworld')
 
   const homeworldsRes$ = homeworldsRes$$.mergeAll()
   const homeworld$ = homeworldsRes$.map(res => {
@@ -32,16 +32,39 @@ function main(sources) {
     return acc
   }, [])
 
-  return {
-    DOM: Observable.combineLatest(users$, homeworlds$, (users, homeworlds) => {
-      return ul(
-        users.map(user => {
-          const homeworld = homeworlds.filter(hw => hw.url === user.homeworld)[0] || {}
-          return li(`${user.name} - ${homeworld.name || 'UNKNOWN'}`)
-        })
-      )
-    }),
+  return { users$, homeworlds$, requestUsers$, requestHomeworlds$ }
+}
 
+function model(users$, homeworlds$) {
+  return Observable.combineLatest(
+    users$,
+    homeworlds$,
+    (users, homeworlds) => {
+      return users.map(user => {
+        const homeworld = homeworlds.filter(hw => hw.url === user.homeworld)[0]
+        return { user, homeworld }
+      })
+    }
+  )
+}
+
+function view(state$) {
+  return state$.map(state =>
+    ul(
+      state.map(model =>
+        li(`${model.user.name} - ${model.homeworld ? model.homeworld.name : 'UNKNOWN'}`)
+      )
+    )
+  )
+}
+
+function main(sources) {
+  const { users$, homeworlds$, requestUsers$, requestHomeworlds$ } = intent(sources.HTTP)
+  const state$ = model(users$, homeworlds$)
+  const vtree$ = view(state$)
+
+  return {
+    DOM: vtree$,
     HTTP: Observable.merge(requestUsers$, requestHomeworlds$)
   }
 }
