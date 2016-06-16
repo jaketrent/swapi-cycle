@@ -3,32 +3,46 @@ import { div, button, h1, ul, li, makeDOMDriver } from '@cycle/dom'
 import { makeHTTPDriver } from '@cycle/http'
 import { Observable } from 'rx'
 
-const url = 'http://swapi.co/api/people/1/'
+const url = 'http://swapi.co/api/people/'
 function main(sources) {
-  const requestUser$ = Observable.just({ url })
+  const requestUsers$ = Observable.just({ url })
 
-  const userRes$$ = sources.HTTP
+  const usersRes$$ = sources.HTTP
     .filter(res$ => res$.request.url === url)
 
-  const userRes$ = userRes$$.switch()
-  const user$ = userRes$.map(res => res.body)
+  const usersRes$ = usersRes$$.switch()
+  const users$ = usersRes$.map(res => res.body.results)
 
-  const requestHomeworld$ = user$.map(user => {
-    return { url: user.homeworld, id: 'homeworld' } 
+  const requestHomeworlds$ = users$.flatMap(users => {
+    return users.map(user => {
+      return { url: user.homeworld, id: 'homeworld' } 
+    })
   })
 
-  const homeworldRes$$ = sources.HTTP
+  const homeworldsRes$$ = sources.HTTP
     .filter(res$ => res$.request.id === 'homeworld')
 
-  const homeworldRes$ = homeworldRes$$.switch()
-  const homeworld$ = homeworldRes$.map(res => res.body)
+  const homeworldsRes$ = homeworldsRes$$.mergeAll()
+  const homeworld$ = homeworldsRes$.map(res => {
+    return res.body
+  })
+
+  const homeworlds$ = homeworld$.scan((acc, homeworld) => {
+    acc = acc.concat(homeworld)
+    return acc
+  }, [])
 
   return {
-    DOM: Observable.combineLatest(user$, homeworld$, (user, homeworld) => {
-      return li(`${user.name} - ${homeworld.name}`)
+    DOM: Observable.combineLatest(users$, homeworlds$, (users, homeworlds) => {
+      return ul(
+        users.map(user => {
+          const homeworld = homeworlds.filter(hw => hw.url === user.homeworld)[0] || {}
+          return li(`${user.name} - ${homeworld.name || 'UNKNOWN'}`)
+        })
+      )
     }),
 
-    HTTP: Observable.merge(requestUser$, requestHomeworld$)
+    HTTP: Observable.merge(requestUsers$, requestHomeworlds$)
   }
 }
 const drivers = {
