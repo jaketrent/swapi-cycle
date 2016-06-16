@@ -5,34 +5,30 @@ import { Observable } from 'rx'
 
 function intent(HTTPSource) {
   const url = 'http://swapi.co/api/people/'
-  const requestUsers$ = Observable.just({ url })
 
-  const usersRes$$ = HTTPSource
-          .filter(res$ => res$.request.url === url)
+  const usersReq$ = Observable.just({ url })
 
-  const usersRes$ = usersRes$$.switch()
-  const users$ = usersRes$.map(res => res.body.results)
+  const users$ = HTTPSource
+    .filter(res$ => res$.request.url === url)
+    .switch()
+    .map(res => res.body.results)
 
-  const requestHomeworlds$ = users$.flatMap(users => {
+  const homeworldsReq$ = users$.flatMap(users => {
     return users.map(user => {
       return { url: user.homeworld, id: 'homeworld' } 
     })
   })
 
-  const homeworldsRes$$ = HTTPSource
-          .filter(res$ => res$.request.id === 'homeworld')
+  const homeworlds$ = HTTPSource
+    .filter(res$ => res$.request.id === 'homeworld')
+    .mergeAll()
+    .map(res => res.body)
+    .scan((acc, homeworld) => {
+      acc = acc.concat(homeworld)
+      return acc
+    }, [])
 
-  const homeworldsRes$ = homeworldsRes$$.mergeAll()
-  const homeworld$ = homeworldsRes$.map(res => {
-    return res.body
-  })
-
-  const homeworlds$ = homeworld$.scan((acc, homeworld) => {
-    acc = acc.concat(homeworld)
-    return acc
-  }, [])
-
-  return { users$, homeworlds$, requestUsers$, requestHomeworlds$ }
+  return { users$, homeworlds$, usersReq$, homeworldsReq$ }
 }
 
 function model(users$, homeworlds$) {
@@ -59,13 +55,13 @@ function view(state$) {
 }
 
 function main(sources) {
-  const { users$, homeworlds$, requestUsers$, requestHomeworlds$ } = intent(sources.HTTP)
+  const { users$, homeworlds$, usersReq$, homeworldsReq$ } = intent(sources.HTTP)
   const state$ = model(users$, homeworlds$)
   const vtree$ = view(state$)
 
   return {
     DOM: vtree$,
-    HTTP: Observable.merge(requestUsers$, requestHomeworlds$)
+    HTTP: Observable.merge(usersReq$, homeworldsReq$)
   }
 }
 const drivers = {
